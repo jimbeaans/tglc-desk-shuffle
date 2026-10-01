@@ -266,6 +266,10 @@
       <div class="actions">
         <button id="shuffle">Shuffle seating</button>
         <button id="undo" class="secondary">Undo shuffle</button>
+        <button id="open-file" class="secondary">Open seating file</button>
+        <button id="save-file" class="secondary" disabled>
+          Save seating file
+        </button>
       </div>
 
       <p id="message" role="status" aria-live="polite"></p>
@@ -294,8 +298,14 @@
             Unfix both desks before swapping fixed occupants.
           </p>
           <p class="muted">
-            Saved automatically in this browser. Fixed backroom
-            occupants stay; all other backroom occupants move out.
+            Seating is saved to <code>seating.json</code>. Open that
+            file once to link it; changes save automatically. On
+            GitHub Pages, use Save seating file and commit the
+            download to keep it for next time.
+          </p>
+          <p class="muted">
+            Fixed backroom occupants stay; all other backroom
+            occupants move out.
           </p>
         </section>
 
@@ -319,8 +329,10 @@
     </main>
 
     <script>
-      const KEY = "visual-desk-planner-v1";
       const OLD_KEY = "seating-13-people-v1";
+      const SEATING_FILE = "seating.json";
+      const DB_NAME = "desk-planner";
+      const HANDLE_STORE = "files";
 
       const definitions = [
         ...Array.from({ length: 9 }, (_, i) => ({
@@ -343,31 +355,171 @@
         fixed: false,
       }));
       let previous = null;
+      let fileHandle = null;
+      let unsavedChanges = false;
 
       const $ = (selector) => document.querySelector(selector);
       const copy = (items) => items.map((item) => ({ ...item }));
       const label = (desk) =>
         `${desk.back ? "Backroom" : "Front"} ${desk.number}`;
+      const supportsFileSystemAccess =
+        "showOpenFilePicker" in window && "showSaveFilePicker" in window;
 
       function notify(text) {
         $("#message").textContent = text;
       }
 
-      function save() {
-        try {
-          localStorage.setItem(KEY, JSON.stringify(desks));
-        } catch {
+      function seatingPayload() {
+        return {
+          desks: desks.map(({ id, name, fixed }) => ({
+            id,
+            name,
+            fixed,
+          })),
+        };
+      }
+
+      function seatingJson() {
+        return JSON.stringify(seatingPayload(), null, 2) + "\n";
+      }
+
+      function applySeating(saved) {
+        const valid =
+          saved &&
+          Array.isArray(saved.desks) &&
+          saved.desks.length === definitions.length &&
+          saved.desks.every(
+            (item, index) =>
+              item &&
+              item.id === definitions[index].id &&
+              typeof item.name === "string" &&
+              typeof item.fixed === "boolean",
+          );
+
+        if (!valid) throw new Error("Invalid seating file");
+
+        const names = saved.desks
+          .filter((item) => item.name)
+          .map((item) => item.name.toLowerCase());
+
+        if (new Set(names).size !== names.length) {
+          throw new Error("Duplicate names");
+        }
+
+        desks = definitions.map((definition, index) => ({
+          ...definition,
+          name: saved.desks[index].name,
+          fixed: Boolean(saved.desks[index].name) && saved.desks[index].fixed,
+        }));
+      }
+
+      function openDb() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME, 1);
+          request.onupgradeneeded = () => {
+            request.result.createObjectStore(HANDLE_STORE);
+          };
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      async function storeFileHandle(handle) {
+        const db = await openDb();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(HANDLE_STORE, "readwrite");
+          tx.objectStore(HANDLE_STORE).put(handle, SEATING_FILE);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      }
+
+      async function readStoredFileHandle() {
+        const db = await openDb();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(HANDLE_STORE, "readonly");
+          const request = tx.objectStore(HANDLE_STORE).get(SEATING_FILE);
+          request.onsuccess = () => resolve(request.result ?? null);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      async function ensureFilePermission(handle, write = false) {
+        const mode = write ? "readwrite" : "read";
+        const options = { mode };
+
+        if ((await handle.queryPermission(options)) === "granted") {
+          return true;
+        }
+
+        return (await handle.requestPermission(options)) === "granted";
+      }
+
+      async function writeToHandle(handle) {
+        const writable = await handle.createWritable();
+        await writable.write(seatingJson());
+        await writable.close();
+      }
+
+      async function readFromHandle(handle) {
+        const file = await handle.getFile();
+        applySeating(JSON.parse(await file.text()));
+      }
+
+      function downloadSeatingFile() {
+        const blob = new Blob([seatingJson()], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = SEATING_FILE;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function updateSaveState() {
+        $("#save-file").disabled = !unsavedChanges;
+      }
+
+      async function save(options = {}) {
+        const { quiet = false } = options;
+
+        if (fileHandle) {
+          try {
+            if (!(await ensureFilePermission(fileHandle, true))) {
+              throw new Error("Write permission denied");
+            }
+
+            await writeToHandle(fileHandle);
+            unsavedChanges = false;
+            updateSaveState();
+
+            if (!quiet) {
+              notify(`Saved to ${fileHandle.name}.`);
+            }
+
+            return;
+          } catch {
+            fileHandle = null;
+          }
+        }
+
+        unsavedChanges = true;
+        updateSaveState();
+
+        if (!quiet) {
           notify(
-            "Browser saving is unavailable. Keep this page open " +
-              "to retain your changes.",
+            "Changes ready to save. Use Save seating file, then replace " +
+              "seating.json in the repo if you use GitHub Pages.",
           );
         }
       }
 
-      function commit(text) {
+      async function commit(text) {
         previous = null;
         notify(text);
-        save();
+        await save({ quiet: Boolean(fileHandle) });
         render();
       }
 
@@ -538,7 +690,7 @@
         if (!$("#name").disabled) $("#name").focus();
       });
 
-      $("#shuffle").addEventListener("click", () => {
+      $("#shuffle").addEventListener("click", async () => {
         if (desks.some((desk) => !desk.name)) {
           notify("Add all 13 people before shuffling.");
           return;
@@ -580,69 +732,92 @@
         });
 
         notify("Shuffled! Unfixed backroom occupants moved to the front.");
-        save();
+        await save({ quiet: true });
         render();
       });
 
-      $("#undo").addEventListener("click", () => {
+      $("#undo").addEventListener("click", async () => {
         if (!previous) return;
         desks = copy(previous);
         previous = null;
         notify("Previous seating restored.");
-        save();
+        await save({ quiet: true });
         render();
       });
 
-      function load() {
-        try {
-          const raw = localStorage.getItem(KEY);
-
-          if (raw !== null) {
-            const saved = JSON.parse(raw);
-            const valid =
-              Array.isArray(saved) &&
-              saved.length === definitions.length &&
-              saved.every(
-                (item, index) =>
-                  item &&
-                  item.id === definitions[index].id &&
-                  typeof item.name === "string" &&
-                  typeof item.fixed === "boolean",
-              );
-
-            if (!valid) throw new Error("Invalid saved seating");
-
-            const names = saved
-              .filter((item) => item.name)
-              .map((item) => item.name.toLowerCase());
-
-            if (new Set(names).size !== names.length) {
-              throw new Error("Duplicate names");
-            }
-
-            desks = definitions.map((definition, index) => ({
-              ...definition,
-              name: saved[index].name,
-              fixed: Boolean(saved[index].name) && saved[index].fixed,
-            }));
-
-            notify("Saved names and desk assignments restored.");
-          } else {
-            importPreviousVersion();
-          }
-        } catch {
+      $("#open-file").addEventListener("click", async () => {
+        if (!supportsFileSystemAccess) {
           notify(
-            "Saved seating could not be loaded. Browser storage " +
-              "may be unavailable.",
+            "Your browser cannot open files directly. Use Save seating " +
+              "file to download seating.json instead.",
           );
+          return;
         }
 
-        render();
-      }
+        try {
+          const [handle] = await window.showOpenFilePicker({
+            types: [
+              {
+                description: "Seating JSON",
+                accept: { "application/json": [".json"] },
+              },
+            ],
+            multiple: false,
+          });
+
+          fileHandle = handle;
+          await readFromHandle(handle);
+          await storeFileHandle(handle);
+          unsavedChanges = false;
+          updateSaveState();
+          notify(`Loaded and linked ${handle.name}. Changes will save there.`);
+          render();
+        } catch (error) {
+          if (error.name !== "AbortError") {
+            notify("Could not open seating file.");
+          }
+        }
+      });
+
+      $("#save-file").addEventListener("click", async () => {
+        if (supportsFileSystemAccess && !fileHandle) {
+          try {
+            fileHandle = await window.showSaveFilePicker({
+              suggestedName: SEATING_FILE,
+              types: [
+                {
+                  description: "Seating JSON",
+                  accept: { "application/json": [".json"] },
+                },
+              ],
+            });
+
+            await writeToHandle(fileHandle);
+            await storeFileHandle(fileHandle);
+            unsavedChanges = false;
+            updateSaveState();
+            notify(`Saved to ${fileHandle.name}.`);
+            return;
+          } catch (error) {
+            if (error.name === "AbortError") return;
+          }
+        } else if (fileHandle) {
+          await save();
+          return;
+        }
+
+        downloadSeatingFile();
+        unsavedChanges = false;
+        updateSaveState();
+        notify(
+          "Downloaded seating.json. Replace the file in the repo and " +
+            "push to keep it for next time on GitHub Pages.",
+        );
+      });
 
       function importPreviousVersion() {
         const raw = localStorage.getItem(OLD_KEY);
-        if (!raw) return;
+        if (!raw) return false;
 
         const old = JSON.parse(raw);
 
@@ -658,11 +833,11 @@
               typeof person.fixed === "boolean",
           )
         ) {
-          return;
+          return false;
         }
 
         const names = old.map((person) => person.name.toLowerCase());
-        if (new Set(names).size !== names.length) return;
+        if (new Set(names).size !== names.length) return false;
 
         old.forEach((person) => {
           const target =
@@ -676,11 +851,63 @@
           target.fixed = person.fixed;
         });
 
-        notify(
-          "Previous names imported. Check desk numbers before shuffling. " +
-            "Unfix people temporarily if you need to change their desks.",
-        );
-        save();
+        return true;
+      }
+
+      function importLegacyStorage() {
+        const raw = localStorage.getItem("visual-desk-planner-v1");
+        if (!raw) return false;
+
+        try {
+          applySeating({ desks: JSON.parse(raw) });
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      async function loadFromBundledFile() {
+        const response = await fetch(`./${SEATING_FILE}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) throw new Error("Missing seating file");
+
+        applySeating(await response.json());
+      }
+
+      async function load() {
+        try {
+          const storedHandle = await readStoredFileHandle();
+
+          if (storedHandle && (await ensureFilePermission(storedHandle))) {
+            fileHandle = storedHandle;
+            await readFromHandle(storedHandle);
+            notify(`Loaded seating from ${storedHandle.name}.`);
+          } else {
+            await loadFromBundledFile();
+            notify("Loaded seating from seating.json.");
+          }
+        } catch {
+          if (importLegacyStorage()) {
+            notify(
+              "Imported seating from your browser. Save seating file to " +
+                "keep it for next time.",
+            );
+            unsavedChanges = true;
+          } else if (importPreviousVersion()) {
+            notify(
+              "Imported previous names. Check desk numbers, then save " +
+                "seating file to keep them.",
+            );
+            unsavedChanges = true;
+          } else {
+            notify("Starting with empty seating. Add people to begin.");
+          }
+        }
+
+        updateSaveState();
+        render();
       }
 
       load();
