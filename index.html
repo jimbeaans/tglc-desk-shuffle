@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Coworking Desk Planner</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #f2f5fa;
+        color: #1d293d;
+        font-family: system-ui, sans-serif;
+      }
+
+      main {
+        max-width: 1100px;
+        margin: auto;
+        padding: 28px 16px;
+      }
+
+      h1,
+      h2 {
+        margin-top: 0;
+      }
+
+      p {
+        line-height: 1.6;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(280px, 360px) 1fr;
+        gap: 24px;
+        align-items: start;
+      }
+
+      .panel,
+      .room {
+        padding: 20px;
+        border: 1px solid #dce3ee;
+        border-radius: 16px;
+        background: white;
+      }
+
+      .panel {
+        position: sticky;
+        top: 16px;
+      }
+
+      form,
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      input[type="text"],
+      select {
+        min-width: 0;
+        padding: 10px;
+        border: 1px solid #b9c5d7;
+        border-radius: 8px;
+        background: white;
+        color: inherit;
+        font: inherit;
+      }
+
+      input[type="text"] {
+        flex: 1;
+        width: 150px;
+      }
+
+      button {
+        padding: 10px 14px;
+        border: 0;
+        border-radius: 8px;
+        background: #285de5;
+        color: white;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        background: #e9eef7;
+        color: #23334e;
+      }
+
+      button.remove {
+        padding: 6px 8px;
+        background: #fff0f0;
+        color: #aa2525;
+        font-size: 13px;
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .person-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        padding: 14px 0;
+        border-bottom: 1px solid #e6ebf3;
+      }
+
+      .person-row strong {
+        align-self: center;
+        overflow-wrap: anywhere;
+      }
+
+      .person-row select {
+        grid-column: 1 / -1;
+        width: 100%;
+      }
+
+      .rooms {
+        display: grid;
+        gap: 20px;
+      }
+
+      .room h2 {
+        color: #64738a;
+        font-size: 14px;
+        letter-spacing: 2px;
+      }
+
+      .floor {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .main-floor {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: repeat(3, minmax(110px, auto));
+      }
+
+      [data-id="f1"] {
+        grid-column: 3;
+        grid-row: 1;
+      }
+
+      [data-id="f2"] {
+        grid-column: 3;
+        grid-row: 2;
+      }
+
+      [data-id="f3"] {
+        grid-column: 2;
+        grid-row: 1 / 3;
+        align-self: center;
+        min-height: 185px;
+      }
+
+      [data-id="f4"] {
+        grid-column: 1;
+        grid-row: 3;
+      }
+
+      [data-id="f5"] {
+        grid-column: 2;
+        grid-row: 3;
+      }
+
+      .desk {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 120px;
+        padding: 12px;
+        border: 2px solid #b7cdf5;
+        border-radius: 10px;
+        background: #f0f6ff;
+      }
+
+      .back .desk {
+        border-color: #cbb9ed;
+        background: #f7f1ff;
+      }
+
+      .desk.fixed {
+        border-color: #d9a23a;
+        background: #fff7e4;
+      }
+
+      .desk-title {
+        color: #526580;
+        font-size: 13px;
+      }
+
+      .occupant {
+        padding: 0;
+        background: transparent;
+        color: #192b48;
+        text-align: left;
+        overflow-wrap: anywhere;
+        font-weight: 700;
+      }
+
+      .occupant:hover {
+        text-decoration: underline;
+      }
+
+      .lock {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+      }
+
+      input[type="checkbox"] {
+        width: 17px;
+        height: 17px;
+      }
+
+      #message {
+        min-height: 26px;
+        font-weight: 600;
+      }
+
+      .muted {
+        color: #64738a;
+        font-size: 14px;
+      }
+
+      @media (max-width: 800px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .panel {
+          position: static;
+        }
+      }
+
+      @media (max-width: 420px) {
+        .room {
+          padding: 12px;
+        }
+
+        .floor {
+          gap: 8px;
+        }
+
+        .desk {
+          padding: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Coworking desk planner</h1>
+      <p>
+        Assign current desks, fix anyone who must stay, then shuffle.
+        Front desks 1–9 span MAIN and TOP.
+      </p>
+
+      <div class="actions">
+        <button id="shuffle">Shuffle seating</button>
+        <button id="undo" class="secondary">Undo shuffle</button>
+      </div>
+
+      <p id="message" role="status" aria-live="polite"></p>
+
+      <div class="layout">
+        <section class="panel">
+          <h2>People & current desks</h2>
+
+          <form id="add-form">
+            <input
+              id="name"
+              type="text"
+              placeholder="Add a name"
+              aria-label="New person's name"
+              maxlength="80"
+              required
+            />
+            <button id="add" type="submit">Add</button>
+          </form>
+
+          <p id="count" class="muted"></p>
+          <div id="people"></div>
+
+          <p class="muted">
+            Choosing an occupied desk swaps the two people.
+            Unfix both desks before swapping fixed occupants.
+          </p>
+          <p class="muted">
+            Saved automatically in this browser. Fixed backroom
+            occupants stay; all other backroom occupants move out.
+          </p>
+        </section>
+
+        <section class="rooms" aria-label="Visual seating plan">
+          <div class="room">
+            <h2>MAIN</h2>
+            <div id="main-room" class="floor main-floor"></div>
+          </div>
+
+          <div class="room">
+            <h2>TOP</h2>
+            <div id="top-room" class="floor"></div>
+          </div>
+
+          <div class="room back">
+            <h2>BACK ROOM</h2>
+            <div id="back-room" class="floor"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const KEY = "visual-desk-planner-v1";
+      const OLD_KEY = "seating-13-people-v1";
+
+      const definitions = [
+        ...Array.from({ length: 9 }, (_, i) => ({
+          id: `f${i + 1}`,
+          number: i + 1,
+          room: i < 5 ? "main-room" : "top-room",
+          back: false,
+        })),
+        ...Array.from({ length: 4 }, (_, i) => ({
+          id: `b${i + 1}`,
+          number: i + 1,
+          room: "back-room",
+          back: true,
+        })),
+      ];
+
+      let desks = definitions.map((desk) => ({
+        ...desk,
+        name: "",
+        fixed: false,
+      }));
+      let previous = null;
+
+      const $ = (selector) => document.querySelector(selector);
+      const copy = (items) => items.map((item) => ({ ...item }));
+      const label = (desk) =>
+        `${desk.back ? "Backroom" : "Front"} ${desk.number}`;
+
+      function notify(text) {
+        $("#message").textContent = text;
+      }
+
+      function save() {
+        try {
+          localStorage.setItem(KEY, JSON.stringify(desks));
+        } catch {
+          notify(
+            "Browser saving is unavailable. Keep this page open " +
+              "to retain your changes.",
+          );
+        }
+      }
+
+      function commit(text) {
+        previous = null;
+        notify(text);
+        save();
+        render();
+      }
+
+      function shuffled(items) {
+        const result = [...items];
+
+        for (let i = result.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [result[i], result[j]] = [result[j], result[i]];
+        }
+
+        return result;
+      }
+
+      function movePerson(sourceId, targetId) {
+        if (sourceId === targetId) return;
+
+        const source = desks.find((desk) => desk.id === sourceId);
+        const target = desks.find((desk) => desk.id === targetId);
+
+        if (source.fixed || target.fixed) {
+          notify("Unfix both desks before changing this assignment.");
+          render();
+          return;
+        }
+
+        [source.name, target.name] = [target.name, source.name];
+        commit("Desk assignments updated and saved.");
+      }
+
+      function renderPeople() {
+        const container = $("#people");
+        container.replaceChildren();
+
+        desks.filter((desk) => desk.name).forEach((desk) => {
+          const row = document.createElement("div");
+          row.className = "person-row";
+
+          const name = document.createElement("strong");
+          name.textContent = desk.name;
+
+          const remove = document.createElement("button");
+          remove.className = "remove";
+          remove.textContent = "Remove";
+          remove.setAttribute("aria-label", `Remove ${desk.name}`);
+
+          remove.addEventListener("click", () => {
+            if (!confirm(`Remove ${desk.name}?`)) return;
+            desk.name = "";
+            desk.fixed = false;
+            commit("Person removed.");
+          });
+
+          const select = document.createElement("select");
+          select.id = `assign-${desk.id}`;
+          select.setAttribute("aria-label", `Desk for ${desk.name}`);
+
+          desks.forEach((target) => {
+            const option = document.createElement("option");
+            option.value = target.id;
+            option.textContent =
+              label(target) +
+              (target.name ? ` — ${target.name}` : " — Empty");
+            option.selected = target.id === desk.id;
+            select.append(option);
+          });
+
+          select.addEventListener("change", () => {
+            movePerson(desk.id, select.value);
+          });
+
+          row.append(name, remove, select);
+          container.append(row);
+        });
+      }
+
+      function renderMap() {
+        ["main-room", "top-room", "back-room"].forEach((id) => {
+          document.getElementById(id).replaceChildren();
+        });
+
+        desks.forEach((desk) => {
+          const card = document.createElement("div");
+          card.className = desk.fixed ? "desk fixed" : "desk";
+          card.dataset.id = desk.id;
+
+          const title = document.createElement("div");
+          title.className = "desk-title";
+          title.textContent = label(desk);
+
+          const occupant = document.createElement("button");
+          occupant.className = "occupant";
+          occupant.textContent = desk.name || "Empty";
+          occupant.setAttribute(
+            "aria-label",
+            desk.name
+              ? `Change desk for ${desk.name}`
+              : `${label(desk)} is empty. Add a person first.`,
+          );
+
+          occupant.addEventListener("click", () => {
+            if (!desk.name) {
+              $("#name").focus();
+              return;
+            }
+
+            const select = document.getElementById(`assign-${desk.id}`);
+            select.scrollIntoView({ behavior: "smooth", block: "center" });
+            select.focus({ preventScroll: true });
+          });
+
+          const lock = document.createElement("label");
+          lock.className = "lock";
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = desk.fixed;
+          checkbox.disabled = !desk.name;
+          checkbox.setAttribute(
+            "aria-label",
+            `Fixed position at ${label(desk)}`,
+          );
+
+          checkbox.addEventListener("change", () => {
+            desk.fixed = checkbox.checked;
+            commit("Fixed-position setting saved.");
+          });
+
+          lock.append(checkbox, document.createTextNode("Fixed"));
+          card.append(title, occupant, lock);
+          document.getElementById(desk.room).append(card);
+        });
+      }
+
+      function render() {
+        renderPeople();
+        renderMap();
+
+        const count = desks.filter((desk) => desk.name).length;
+        $("#count").textContent = `${count} / 13 people added`;
+        $("#add").disabled = count === 13;
+        $("#name").disabled = count === 13;
+        $("#shuffle").disabled = count !== 13;
+        $("#undo").disabled = previous === null;
+      }
+
+      $("#add-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        const name = $("#name").value.trim();
+        const empty = desks.find((desk) => !desk.name);
+
+        if (!name || !empty) return;
+
+        if (
+          desks.some(
+            (desk) => desk.name.toLowerCase() === name.toLowerCase(),
+          )
+        ) {
+          notify("Name already exists. Add an initial to distinguish it.");
+          return;
+        }
+
+        empty.name = name;
+        $("#name").value = "";
+        commit(`${name} added. Choose their current desk in the list.`);
+
+        if (!$("#name").disabled) $("#name").focus();
+      });
+
+      $("#shuffle").addEventListener("click", () => {
+        if (desks.some((desk) => !desk.name)) {
+          notify("Add all 13 people before shuffling.");
+          return;
+        }
+
+        const front = desks.filter((desk) => !desk.back && !desk.fixed);
+        const back = desks.filter((desk) => desk.back && !desk.fixed);
+
+        if (front.length < back.length) {
+          notify(
+            `Unfix ${back.length - front.length} more front desk(s) ` +
+              "so all unfixed backroom occupants can move out.",
+          );
+          return;
+        }
+
+        if (front.length + back.length < 2) {
+          notify("Unfix at least two people to shuffle.");
+          return;
+        }
+
+        previous = copy(desks);
+
+        const frontTargets = shuffled(front);
+        const backNames = shuffled(back.map((desk) => desk.name));
+        const frontNames = shuffled(front.map((desk) => desk.name));
+
+        backNames.forEach((name, index) => {
+          frontTargets[index].name = name;
+        });
+
+        const remaining = [
+          ...frontTargets.slice(backNames.length),
+          ...back,
+        ];
+
+        remaining.forEach((desk, index) => {
+          desk.name = frontNames[index];
+        });
+
+        notify("Shuffled! Unfixed backroom occupants moved to the front.");
+        save();
+        render();
+      });
+
+      $("#undo").addEventListener("click", () => {
+        if (!previous) return;
+        desks = copy(previous);
+        previous = null;
+        notify("Previous seating restored.");
+        save();
+        render();
+      });
+
+      function load() {
+        try {
+          const raw = localStorage.getItem(KEY);
+
+          if (raw !== null) {
+            const saved = JSON.parse(raw);
+            const valid =
+              Array.isArray(saved) &&
+              saved.length === definitions.length &&
+              saved.every(
+                (item, index) =>
+                  item &&
+                  item.id === definitions[index].id &&
+                  typeof item.name === "string" &&
+                  typeof item.fixed === "boolean",
+              );
+
+            if (!valid) throw new Error("Invalid saved seating");
+
+            const names = saved
+              .filter((item) => item.name)
+              .map((item) => item.name.toLowerCase());
+
+            if (new Set(names).size !== names.length) {
+              throw new Error("Duplicate names");
+            }
+
+            desks = definitions.map((definition, index) => ({
+              ...definition,
+              name: saved[index].name,
+              fixed: Boolean(saved[index].name) && saved[index].fixed,
+            }));
+
+            notify("Saved names and desk assignments restored.");
+          } else {
+            importPreviousVersion();
+          }
+        } catch {
+          notify(
+            "Saved seating could not be loaded. Browser storage " +
+              "may be unavailable.",
+          );
+        }
+
+        render();
+      }
+
+      function importPreviousVersion() {
+        const raw = localStorage.getItem(OLD_KEY);
+        if (!raw) return;
+
+        const old = JSON.parse(raw);
+
+        if (
+          !Array.isArray(old) ||
+          old.length > 13 ||
+          !old.every(
+            (person) =>
+              person &&
+              typeof person.name === "string" &&
+              person.name.trim() &&
+              typeof person.backroom === "boolean" &&
+              typeof person.fixed === "boolean",
+          )
+        ) {
+          return;
+        }
+
+        const names = old.map((person) => person.name.toLowerCase());
+        if (new Set(names).size !== names.length) return;
+
+        old.forEach((person) => {
+          const target =
+            desks.find(
+              (desk) => !desk.name && desk.back === person.backroom,
+            ) || desks.find((desk) => !desk.name);
+
+          if (!target) return;
+
+          target.name = person.name;
+          target.fixed = person.fixed;
+        });
+
+        notify(
+          "Previous names imported. Check desk numbers before shuffling. " +
+            "Unfix people temporarily if you need to change their desks.",
+        );
+        save();
+      }
+
+      load();
+    </script>
+  </body>
+</html>
