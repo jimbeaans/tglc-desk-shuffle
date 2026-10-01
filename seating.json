@@ -1,17 +1,69 @@
 {
   "desks": [
-    { "id": "f1", "name": "", "fixed": false },
-    { "id": "f2", "name": "", "fixed": false },
-    { "id": "f3", "name": "", "fixed": false },
-    { "id": "f4", "name": "", "fixed": false },
-    { "id": "f5", "name": "", "fixed": false },
-    { "id": "f6", "name": "", "fixed": false },
-    { "id": "f7", "name": "", "fixed": false },
-    { "id": "f8", "name": "", "fixed": false },
-    { "id": "f9", "name": "", "fixed": false },
-    { "id": "b1", "name": "", "fixed": false },
-    { "id": "b2", "name": "", "fixed": false },
-    { "id": "b3", "name": "", "fixed": false },
-    { "id": "b4", "name": "", "fixed": false }
+    {
+      "id": "f1",
+      "name": "Jan Sommer",
+      "fixed": false
+    },
+    {
+      "id": "f2",
+      "name": "Andreas Babenko",
+      "fixed": false
+    },
+    {
+      "id": "f3",
+      "name": "Henning Herholz",
+      "fixed": false
+    },
+    {
+      "id": "f4",
+      "name": "Maria Gyisi",
+      "fixed": false
+    },
+    {
+      "id": "f5",
+      "name": "Martin Anderle",
+      "fixed": false
+    },
+    {
+      "id": "f6",
+      "name": "Manuel",
+      "fixed": false
+    },
+    {
+      "id": "f7",
+      "name": "Michael Fritz",
+      "fixed": false
+    },
+    {
+      "id": "f8",
+      "name": "Julian Kaltschmidt",
+      "fixed": false
+    },
+    {
+      "id": "f9",
+      "name": "Oleksi",
+      "fixed": false
+    },
+    {
+      "id": "b1",
+      "name": "Johan",
+      "fixed": true
+    },
+    {
+      "id": "b2",
+      "name": "Philipp Ries",
+      "fixed": false
+    },
+    {
+      "id": "b3",
+      "name": "Michael Titze",
+      "fixed": true
+    },
+    {
+      "id": "b4",
+      "name": "Fabius Kossack",
+      "fixed": false
+    }
   ]
 }
