@@ -2,12 +2,12 @@
   "desks": [
     {
       "id": "f1",
-      "name": "Jan Sommer",
+      "name": "Maria Gyisi",
       "fixed": false
     },
     {
       "id": "f2",
-      "name": "Andreas Babenko",
+      "name": "Julian Kaltschmidt",
       "fixed": false
     },
     {
@@ -17,32 +17,32 @@
     },
     {
       "id": "f4",
-      "name": "Maria Gyisi",
-      "fixed": false
-    },
-    {
-      "id": "f5",
       "name": "Martin Anderle",
       "fixed": false
     },
     {
-      "id": "f6",
-      "name": "Manuel",
-      "fixed": false
-    },
-    {
-      "id": "f7",
+      "id": "f5",
       "name": "Michael Fritz",
       "fixed": false
     },
     {
+      "id": "f6",
+      "name": "Philipp Ries",
+      "fixed": false
+    },
+    {
+      "id": "f7",
+      "name": "Manuel",
+      "fixed": false
+    },
+    {
       "id": "f8",
-      "name": "Julian Kaltschmidt",
+      "name": "Oleksi",
       "fixed": false
     },
     {
       "id": "f9",
-      "name": "Oleksi",
+      "name": "Fabius Kossack",
       "fixed": false
     },
     {
@@ -52,7 +52,7 @@
     },
     {
       "id": "b2",
-      "name": "Philipp Ries",
+      "name": "Andreas Babenko",
       "fixed": false
     },
     {
@@ -62,7 +62,7 @@
     },
     {
       "id": "b4",
-      "name": "Fabius Kossack",
+      "name": "Jan Sommer",
       "fixed": false
     }
   ]
